@@ -4,36 +4,50 @@
 #include <stdint.h>
 #include <gmp.h>
 
-/* Sampling parameters */
-#define SIGMA 3.19
-#define MU 0
-
 /* Polynomial degree */
 #define LGD 14
 #define D (1 << LGD)
 
-/* Plaintext modulus */
-#define T 2
+/* Initial bit length */
+#define LGQ 237
 
-/* The length of the RNS decomposition of q */
-#define M 8
+/* RNS bit length */
+#define M 25
 
-/* Ciphertext modulus q */
-extern const char *Q_str;
-extern mpz_t Q;
+#define L (1 << 4)
 
-/* RNS basis for q */
-extern uint32_t rns_basis[M];
+typedef struct level_t {
+  /* polynomial degree */
+  size_t d;
 
-/* Used to convert back from an RNS representation */
-extern mpz_t crt_coefs[M];
+  /* size of the RNS basis of q */
+  size_t m;
 
-/* Montgomery encoding */
+  /* RNS basis for q */
+  uint32_t *basis;
 
-/* 1 / (R-q_i) mod R */
-extern uint32_t r_minus_q_inv[M];
+  /* powers of a primitive 2nth root of unity (reverse order) */
+  int32_t *roots;
 
-/* R^2 mod q_i */
-extern uint32_t r_squared_mod_q[M];
+  /* inverse powers of a primitive 2nth root of unity (reverse order) */
+  int32_t *iroots;
+
+  /* CRT coefficients used to convert back from an RNS representation */
+  mpz_t Q, *crt_coefs;
+} level_t;
+
+typedef struct bgv_t {
+  /* Circuit depth */
+  size_t l;
+
+  /* Level parameters */
+  level_t *levels;
+} bgv_t;
+
+/* Initialize parameters */
+void bgv_init(bgv_t *, size_t, size_t, int);
+
+/* Free parameters */
+void bgv_free(bgv_t *);
 
 #endif                          /* PARAMS_H */

@@ -1,31 +1,39 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #include "params/params.h"
-#include "rlwe/zq.h"
+#include "utils/utils.h"
+#include "ring/rq.h"
 
 int main() {
-  zq_t x;
-  mpz_t out;
+  bgv_t b;
+  rq_t r1;
+  level_t *l;
 
-  mpz_init(out);
-  mpz_init_set_str(Q, Q_str, 10);
+  bgv_init(&b, LGQ, LGD, L);
 
-  for (int i = 0; i < M; ++i)
-    mpz_init(crt_coefs[M]);
+  for (size_t i = 0; i < L; ++i) {
+    l = b.levels + i;
+    rq_init(&r1, l, NULL);
 
-  crt_init();
+    srand(0);
+    for (size_t j = 0; j < l->m; ++j)
+      for (size_t k = 0; k < l->d; ++k)
+        r1.b[j * l->d + k] = rand() % l->basis[j];
 
-  zq_from_mpz(&x, Q);
-  zq_to_mpz(out, &x);
+    rq_ntt(&r1);
+    rq_intt(&r1);
 
-  mpz_out_str(stdout, 10, out);
-  printf("\n");
+    srand(0);
+    for (size_t j = 0; j < l->m; ++j)
+      for (size_t k = 0; k < l->d; ++k)
+        assert(r1.b[j * l->d + k] == (int32_t) (rand() % l->basis[j]));
 
-  for (int i = 0; i < M; ++i)
-    mpz_clear(crt_coefs[M]);
+    rq_free(&r1);
+  }
 
-  mpz_clear(out);
-  mpz_clear(Q);
+  bgv_free(&b);
 
   return 0;
 }

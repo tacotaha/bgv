@@ -1,23 +1,100 @@
-#include <stdint.h>
-#include <gmp.h>
+#include <assert.h>
 
 #include "params.h"
+#include "utils/utils.h"
 
-/* CRT coefficients */
-mpz_t crt_coefs[M];
+void rns_init(level_t * l) {
+  uint32_t inv;
+  l->crt_coefs = malloc_or_die(sizeof(mpz_t) * l->m);
 
-/* Ciphertext modulus q */
-mpz_t Q;
-const char *Q_str = "50679783804403462340256613581969530309612361497226257802787414186716561409";
+  mpz_init_set_ui(l->Q, l->basis[0]);
+  for (size_t i = 0; i < l->m; ++i)
+    mpz_init(l->crt_coefs[i]);
 
-/* RNS basis for q */
-uint32_t rns_basis[] =
-  { 0x65f38001, 0x552f0001, 0x65fc8001, 0x4af38001, 0x7a808001, 0x47e00001, 0x7f420001, 0x6c8b0001 };
+  /* express Q as a product over the basis */
+  for (size_t i = 1; i < l->m; ++i)
+    mpz_mul_ui(l->Q, l->Q, l->basis[i]);
 
-// 1 / (R-q_i) mod R
-uint32_t r_minus_q_inv[] =
-  { 0x25f37fff, 0x552effff, 0x25fc7fff, 0xaf37fff, 0x3a807fff, 0x47dfffff, 0x7f41ffff, 0x6c8affff };
+  /* generate CRT coefficients */
+  for (size_t i = 0; i < l->m; ++i) {
+    mpz_divexact_ui(l->crt_coefs[i], l->Q, l->basis[i]);
+    inv = mpz_fdiv_ui(l->crt_coefs[i], l->basis[i]);
+    inv = modinv(inv, l->basis[i]);
+    mpz_mul_ui(l->crt_coefs[i], l->crt_coefs[i], inv);
+  }
+}
 
-// R^2 mod q_i
-uint32_t r_squared_mod_q[] =
-  { 0x178a36b1, 0x3c8d64c9, 0x58c3f0c1, 0x470d0e72, 0x51c55180, 0x1dd1dd53, 0x23a39150, 0x45677e6d };
+void rou_init(level_t * l, size_t lgd) {
+  int32_t root, iroot, t, u;
+  for (size_t i = 0; i < l->m; ++i) {
+    l->roots[i * l->d] = 1;
+    l->iroots[i * l->d] = 1;
+  }
+
+  for (uint32_t i = 0; i < l->m; ++i) {
+    root = find_proot(l->basis[i], l->d << 1);
+    iroot = modinv(root, l->basis[i]);
+
+    /* primitive 2n-th root of unity */
+    assert(modexp(root, l->d << 1, l->basis[i]) == 1);
+    assert(modexp(iroot, l->d << 1, l->basis[i]) == 1);
+
+    for (uint32_t j = 1; j < l->d; ++j) {
+      t = i * l->d + (reverse(j) >> (32 - lgd));
+      u = i * l->d + (reverse(j - 1) >> (32 - lgd));
+      l->roots[t] = modmul(l->roots[u], root, l->basis[i]);
+      l->iroots[t] = modmul(l->iroots[u], iroot, l->basis[i]);
+    }
+  }
+}
+
+void bgv_init(bgv_t * b, size_t lgq, size_t lgd, int l) {
+  level_t *lvl;
+  uint64_t nbits, m, d = (1UL << lgd);
+
+  b->l = l;
+  b->levels = malloc_or_die(sizeof(level_t) * l);
+
+  for (int i = l - 1; i > -1; --i) {
+    nbits = (i + 1) * lgq, m = (nbits / M) + 1;
+    lvl = b->levels + i;
+    lvl->m = m;
+    lvl->d = d;
+    if (i == l - 1) {
+      lvl->basis = malloc_or_die(sizeof(uint32_t) * m);
+      lvl->roots = malloc_or_die(sizeof(int32_t) * (m << lgd));
+      lvl->iroots = malloc_or_die(sizeof(int32_t) * (m << lgd));
+      gen_primes(nbits / m + 1, lgd + 1, lvl->basis, m);
+      rou_init(lvl, lgd);
+    } else {
+      lvl->basis = b->levels[l - 1].basis;
+      lvl->roots = b->levels[l - 1].roots;
+      lvl->iroots = b->levels[l - 1].iroots;
+    }
+    rns_init(lvl);
+  }
+}
+
+void bgv_free(bgv_t * b) {
+  level_t *l;
+  for (size_t i = 0; i < b->l; ++i) {
+    l = b->levels + i;
+    if (i == b->l - 1) {
+      free(l->basis);
+      free(l->roots);
+      free(l->iroots);
+    }
+
+    mpz_clear(l->Q);
+    for (size_t j = 0; j < l->m; ++j)
+      mpz_clear(l->crt_coefs[j]);
+    free(l->crt_coefs);
+
+    l->basis = NULL;
+    l->roots = NULL;
+    l->iroots = NULL;
+    l->crt_coefs = NULL;
+  }
+
+  free(b->levels);
+}

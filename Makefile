@@ -1,8 +1,8 @@
 ROOT=$(realpath .)
 CC=gcc
 CFLAGS=-O3 -Wall -Wextra -Werror -I$(ROOT)
-LDFLAGS=-lgmp
-OBJ=params/params.o rlwe/zq.o
+LDFLAGS=-lgmp -lm
+OBJ=params/params.o utils/utils.o ring/rq.o ring/ntt.o
 EXEC=bgv
 
 all: $(EXEC)
