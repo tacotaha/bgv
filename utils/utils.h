@@ -41,9 +41,9 @@ static inline uint64_t rand64() {
 }
 
 static inline void *malloc_or_die(size_t size) {
-  void *mem = malloc(size);
+  void *mem = calloc(1, size);
   if (!mem) {
-    perror("malloc:");
+    perror("calloc:");
     exit(-1);
   }
   return mem;

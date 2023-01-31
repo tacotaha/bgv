@@ -2,7 +2,7 @@ ROOT=$(realpath .)
 CC=gcc
 CFLAGS=-O3 -Wall -Wextra -Werror -I$(ROOT)
 LDFLAGS=-lgmp -lm
-OBJ=params/params.o utils/utils.o ring/rq.o ring/ntt.o
+OBJ=params/params.o utils/utils.o ring/rq.o ring/ntt.o rlwe/rlwe.o
 EXEC=bgv
 
 all: $(EXEC)

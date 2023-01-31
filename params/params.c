@@ -1,100 +1,61 @@
 #include <assert.h>
+#include <gmp.h>
 
-#include "params.h"
 #include "utils/utils.h"
+#include "params.h"
 
-void rns_init(level_t * l) {
-  uint32_t inv;
-  l->crt_coefs = malloc_or_die(sizeof(mpz_t) * l->m);
+uint32_t _basis[M] = { 0 };
 
-  mpz_init_set_ui(l->Q, l->basis[0]);
-  for (size_t i = 0; i < l->m; ++i)
-    mpz_init(l->crt_coefs[i]);
+int32_t _roots[M << LGD], _iroots[M << LGD];
+mpz_t _Q, _Q_half, _crt_coefs[M];
 
-  /* express Q as a product over the basis */
-  for (size_t i = 1; i < l->m; ++i)
-    mpz_mul_ui(l->Q, l->Q, l->basis[i]);
+void bgv_init() {
+  int32_t root, iroot, t, u, inv;
 
-  /* generate CRT coefficients */
-  for (size_t i = 0; i < l->m; ++i) {
-    mpz_divexact_ui(l->crt_coefs[i], l->Q, l->basis[i]);
-    inv = mpz_fdiv_ui(l->crt_coefs[i], l->basis[i]);
-    inv = modinv(inv, l->basis[i]);
-    mpz_mul_ui(l->crt_coefs[i], l->crt_coefs[i], inv);
+  /* generate special primes */
+  gen_primes(LGM, LGD + 1, _basis, M);
+
+  /* primitive 2n-th roots of unity */
+  for (size_t i = 0; i < M; ++i) {
+    _roots[i * D] = 1;
+    _iroots[i * D] = 1;
+  }
+
+  for (uint32_t i = 0; i < M; ++i) {
+    root = find_proot(_basis[i], LGD + 1);
+    iroot = modinv(root, _basis[i]);
+
+    assert(modexp(root, D << 1, _basis[i]) == 1);
+    assert(modexp(iroot, D << 1, _basis[i]) == 1);
+
+    for (uint32_t j = 1; j < D; ++j) {
+      t = i * D + (reverse(j) >> (32 - LGD));
+      u = i * D + (reverse(j - 1) >> (32 - LGD));
+      _roots[t] = modmul(_roots[u], root, _basis[i]);
+      _iroots[t] = modmul(_iroots[u], iroot, _basis[i]);
+    }
+  }
+
+  /* CRT coefficients */
+  mpz_init_set_ui(_Q, _basis[0]);
+  for (int i = 1; i < M; ++i)
+    mpz_mul_ui(_Q, _Q, _basis[i]);
+
+  mpz_init_set(_Q_half, _Q);
+  mpz_cdiv_q_ui(_Q_half, _Q, 2);
+
+  for (int i = 0; i < M; ++i) {
+    mpz_init(_crt_coefs[i]);
+    mpz_divexact_ui(_crt_coefs[i], _Q, _basis[i]);
+    inv = mpz_fdiv_ui(_crt_coefs[i], _basis[i]);
+    inv = modinv(inv, _basis[i]);
+    mpz_mul_ui(_crt_coefs[i], _crt_coefs[i], inv);
   }
 }
 
-void rou_init(level_t * l, size_t lgd) {
-  int32_t root, iroot, t, u;
-  for (size_t i = 0; i < l->m; ++i) {
-    l->roots[i * l->d] = 1;
-    l->iroots[i * l->d] = 1;
-  }
-
-  for (uint32_t i = 0; i < l->m; ++i) {
-    root = find_proot(l->basis[i], l->d << 1);
-    iroot = modinv(root, l->basis[i]);
-
-    /* primitive 2n-th root of unity */
-    assert(modexp(root, l->d << 1, l->basis[i]) == 1);
-    assert(modexp(iroot, l->d << 1, l->basis[i]) == 1);
-
-    for (uint32_t j = 1; j < l->d; ++j) {
-      t = i * l->d + (reverse(j) >> (32 - lgd));
-      u = i * l->d + (reverse(j - 1) >> (32 - lgd));
-      l->roots[t] = modmul(l->roots[u], root, l->basis[i]);
-      l->iroots[t] = modmul(l->iroots[u], iroot, l->basis[i]);
-    }
-  }
-}
-
-void bgv_init(bgv_t * b, size_t lgq, size_t lgd, int l) {
-  level_t *lvl;
-  uint64_t nbits, m, d = (1UL << lgd);
-
-  b->l = l;
-  b->levels = malloc_or_die(sizeof(level_t) * l);
-
-  for (int i = l - 1; i > -1; --i) {
-    nbits = (i + 1) * lgq, m = (nbits / M) + 1;
-    lvl = b->levels + i;
-    lvl->m = m;
-    lvl->d = d;
-    if (i == l - 1) {
-      lvl->basis = malloc_or_die(sizeof(uint32_t) * m);
-      lvl->roots = malloc_or_die(sizeof(int32_t) * (m << lgd));
-      lvl->iroots = malloc_or_die(sizeof(int32_t) * (m << lgd));
-      gen_primes(nbits / m + 1, lgd + 1, lvl->basis, m);
-      rou_init(lvl, lgd);
-    } else {
-      lvl->basis = b->levels[l - 1].basis;
-      lvl->roots = b->levels[l - 1].roots;
-      lvl->iroots = b->levels[l - 1].iroots;
-    }
-    rns_init(lvl);
-  }
-}
-
-void bgv_free(bgv_t * b) {
-  level_t *l;
-  for (size_t i = 0; i < b->l; ++i) {
-    l = b->levels + i;
-    if (i == b->l - 1) {
-      free(l->basis);
-      free(l->roots);
-      free(l->iroots);
-    }
-
-    mpz_clear(l->Q);
-    for (size_t j = 0; j < l->m; ++j)
-      mpz_clear(l->crt_coefs[j]);
-    free(l->crt_coefs);
-
-    l->basis = NULL;
-    l->roots = NULL;
-    l->iroots = NULL;
-    l->crt_coefs = NULL;
-  }
-
-  free(b->levels);
+void bgv_free() {
+  for (int i = 0; i < M; ++i)
+    mpz_clear(_crt_coefs[i]);
+  mpz_clear(_Q);
+  mpz_clear(_Q_half);
 }

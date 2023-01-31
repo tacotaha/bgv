@@ -8,46 +8,33 @@
 #define LGD 14
 #define D (1 << LGD)
 
-/* Initial bit length */
+/* Q_0 bit length */
 #define LGQ 237
 
 /* RNS bit length */
-#define M 25
+#define LGM 25
 
-#define L (1 << 4)
+/* Number of RNS coefficients */
+#define M (LGQ/LGM + 1)
 
-typedef struct level_t {
-  /* polynomial degree */
-  size_t d;
+/* Sampling parameters */
+#define MU 0
+#define SIGMA 3.19
 
-  /* size of the RNS basis of q */
-  size_t m;
+/* Plaintext modulus */
+#define T 65537
 
-  /* RNS basis for q */
-  uint32_t *basis;
+/* RNS basis for Q */
+extern uint32_t _basis[M];
 
-  /* powers of a primitive 2nth root of unity (reverse order) */
-  int32_t *roots;
+/* N-th Roots of unity */
+extern int32_t _roots[M << LGD], _iroots[M << LGD];
 
-  /* inverse powers of a primitive 2nth root of unity (reverse order) */
-  int32_t *iroots;
+/*  CRT coefficients */
+extern mpz_t _Q, _Q_half, _crt_coefs[M];
 
-  /* CRT coefficients used to convert back from an RNS representation */
-  mpz_t Q, *crt_coefs;
-} level_t;
-
-typedef struct bgv_t {
-  /* Circuit depth */
-  size_t l;
-
-  /* Level parameters */
-  level_t *levels;
-} bgv_t;
-
-/* Initialize parameters */
-void bgv_init(bgv_t *, size_t, size_t, int);
-
-/* Free parameters */
-void bgv_free(bgv_t *);
+/* Init parameters */
+void bgv_init();
+void bgv_free();
 
 #endif                          /* PARAMS_H */

@@ -1,6 +1,5 @@
 #include <math.h>
 
-#include "params/params.h"
 #include "utils/utils.h"
 
 int is_prime(uint64_t p) {
@@ -36,24 +35,22 @@ void gen_primes(uint32_t l, uint32_t m, uint32_t * p, size_t n) {
   m = (1UL << m);
   l = (1UL << l);
 
-  for (size_t i = 0; i < n; ++i) {
+  for (size_t i = 0; i < n; ++i)
     do {
       p[i] = l + k++ * m + 1;
     } while (!is_prime(p[i]));
-  }
 }
 
 
-/* Find a primitive nth root of unity */
-uint64_t find_proot(uint64_t p, uint64_t n) {
-  uint64_t r, omega, x = (p - 1) / n;
+/* Find a primitive 2^m-th root of unity */
+uint64_t find_proot(uint64_t p, uint64_t lgn) {
+  uint64_t r;
 
   do {
     r = (rand64() % (p - 1)) + 2;
-    omega = modexp(r, x, p);
-  } while (modexp(omega, n >> 1, p) == 1);
+  } while (modexp(r, (p - 1) >> 1, p) == 1);
 
-  return omega;
+  return modexp(r, (p - 1) >> lgn, p);
 }
 
 int modinv(int x, int y) {

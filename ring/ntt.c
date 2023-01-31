@@ -1,9 +1,9 @@
 #include "utils/utils.h"
 #include "rq.h"
 
-void _ntt(int32_t * roots, int32_t * x, uint32_t q, uint32_t d) {
+void _ntt(int32_t * roots, int32_t * x, uint32_t q) {
   int S, U, V;
-  for (size_t m = 1, t = d >> 1; m < d; m <<= 1, t >>= 1) {
+  for (size_t m = 1, t = D >> 1; m < D; m <<= 1, t >>= 1) {
     for (size_t i = 0, k = 0; i < m; ++i, k += (t << 1)) {
       S = roots[m + i];
       for (size_t j = k; j < k + t; ++j) {
@@ -16,9 +16,9 @@ void _ntt(int32_t * roots, int32_t * x, uint32_t q, uint32_t d) {
   }
 }
 
-void _intt(int32_t * iroots, int32_t * x, uint32_t q, uint32_t d) {
+void _intt(int32_t * iroots, int32_t * x, uint32_t q) {
   uint32_t S, U, V, invd;
-  for (size_t m = d >> 1, t = 1; m > 0; m >>= 1, t <<= 1)
+  for (size_t m = D >> 1, t = 1; m > 0; m >>= 1, t <<= 1)
     for (size_t i = 0, k = 0; i < m; ++i, k += (t << 1)) {
       S = iroots[m + i];
       for (size_t j = k; j < k + t; ++j) {
@@ -28,8 +28,8 @@ void _intt(int32_t * iroots, int32_t * x, uint32_t q, uint32_t d) {
         x[j + t] = modmul(modsub(U, V, q), S, q);
       }
     }
-  invd = modinv(d, q);
-  for (size_t i = 0; i < d; ++i) {
+  invd = modinv(D, q);
+  for (size_t i = 0; i < D; ++i) {
     x[i] = modmul(x[i], invd, q);
     x[i] -= q;
     x[i] += (x[i] >> 31) & q;
@@ -37,23 +37,15 @@ void _intt(int32_t * iroots, int32_t * x, uint32_t q, uint32_t d) {
 }
 
 void rq_ntt(rq_t * r) {
-  level_t *l = r->l;
-  if (!r->is_ntt) {
-    for (size_t i = 0; i < r->l->m; ++i) {
-      int offset = i * l->d;
-      _ntt(l->roots + offset, r->b + offset, l->basis[i], l->d);
-    }
-    r->is_ntt |= 1;
+  for (size_t i = 0; i < M; ++i) {
+    int offset = i * D;
+    _ntt(_roots + offset, r->b + offset, _basis[i]);
   }
 }
 
 void rq_intt(rq_t * r) {
-  level_t *l = r->l;
-  if (r->is_ntt) {
-    for (size_t i = 0; i < r->l->m; ++i) {
-      int offset = i * l->d;
-      _intt(l->iroots + offset, r->b + offset, l->basis[i], l->d);
-    }
-    r->is_ntt &= 0;
+  for (size_t i = 0; i < M; ++i) {
+    int offset = i * D;
+    _intt(_iroots + offset, r->b + offset, _basis[i]);
   }
 }
