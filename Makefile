@@ -1,9 +1,9 @@
 ROOT=$(realpath .)
 CC=gcc
-CFLAGS=-O3 -Wall -Wextra -Werror -I$(ROOT)
-LDFLAGS=-lgmp -lm
-OBJ=params/params.o utils/utils.o ring/rq.o ring/ntt.o rlwe/rlwe.o
-EXEC=bgv
+CFLAGS=-O3 -Wall -Wextra -Werror -fopenmp -I$(ROOT)
+LDFLAGS=-lm -lgmp -lgomp
+OBJ=utils/utils.o bgv/bgv.o ring/ntt.o ring/ring.o ring/poly.o
+EXEC=test
 
 all: $(EXEC)
 
@@ -17,7 +17,4 @@ memcheck: $(EXEC)
 	valgrind --leak-check=full --show-leak-kinds=all ./$(EXEC)
 
 clean:
-	rm -rf $(OBJ) $(EXEC) *.o *.a *~
-
-format:
-	find . -maxdepth 2 -regextype posix-extended -regex ".*\.(c|h)" | xargs indent -par -br -brf -brs -kr -ci2 -cli2 -i2 -l120 -nut
+	rm -f $(OBJ) $(EXEC) *.o *.a *~

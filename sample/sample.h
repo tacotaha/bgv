@@ -1,14 +1,14 @@
 #ifndef SAMPLE_H
 #define SAMPLE_H
 
-#include <stdint.h>
 #include <math.h>
+#include <stdint.h>
 
 #include "entropy.h"
-#include "params/params.h"
 
-/* exp(-0.5) */
-#define P ((double)0.606530659712633)
+#define EXP_MINUS_HALF ((double)0.606530659712633)
+#define MU 0
+#define SIGMA 3.19
 
 typedef enum DISTRIBUTION {
   UNIFORM = 0,
@@ -17,15 +17,12 @@ typedef enum DISTRIBUTION {
 } DISTRIBUTION;
 
 /* half-exponential Bernoulli trial */
-static inline uint8_t bernoulli() {
-  return uniformr() < P;
-}
+static inline uint8_t bernoulli() { return uniformr() < EXP_MINUS_HALF; }
 
 /* sample k >= 0 w.p. exp(k/2)(1−1/sqrt(e)) */
 static inline uint32_t G() {
   int n = 0;
-  while (bernoulli())
-    ++n;
+  while (bernoulli()) ++n;
   return n;
 }
 
@@ -33,12 +30,10 @@ static inline uint32_t G() {
 static inline int32_t S() {
   for (;;) {
     int k = G();
-    if (k < 2)
-      return k;
+    if (k < 2) return k;
     int z = k * (k - 1);
     while (z-- && bernoulli());
-    if (z < 0)
-      return k;
+    if (z < 0) return k;
   }
 }
 
@@ -46,20 +41,18 @@ static inline int32_t sample_err() {
   for (;;) {
     int k = S();
 
-    int s = uniformb()? -1 : 1;
+    int s = uniformb() ? -1 : 1;
 
     double xn0 = k * SIGMA + s * MU;
     int i0 = ceil(xn0);
     xn0 = (i0 - xn0) / SIGMA;
-    int j = uniform32() % (int) ceil(SIGMA);
+    int j = uniform32() % (int)ceil(SIGMA);
 
-    double x = xn0 + ((double) j) / SIGMA;
-    if (x >= 1 || (x == 0 && s < 0 && k == 0))
-      continue;
+    double x = xn0 + ((double)j) / SIGMA;
+    if (x >= 1 || (x == 0 && s < 0 && k == 0)) continue;
 
     xn0 = exp(-x * ((k << 1) + x) / 2);
-    if (x == 0 || uniformr() <= xn0)
-      return s * (i0 + j);
+    if (x == 0 || uniformr() <= xn0) return s * (i0 + j);
   }
 }
 
@@ -75,4 +68,4 @@ static inline int32_t sample(DISTRIBUTION d) {
   return -1;
 }
 
-#endif                          /* SAMPLE_H */
+#endif /* SAMPLE_H */

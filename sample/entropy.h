@@ -28,18 +28,12 @@ static inline double uniformr() {
 
 #else
 
-static inline uint32_t uniform32() {
-  return (uint32_t) random();
-}
+static inline uint32_t uniform32() { return (uint32_t)random(); }
 
-static inline double uniformr() {
-  return drand48();
-}
+static inline double uniformr() { return drand48(); }
 
-#endif                          /* CSPRNG */
+#endif /* CSPRNG */
 
-static inline uint8_t uniformb() {
-  return uniform32() & 1;
-}
+static inline uint8_t uniformb() { return uniform32() & 1; }
 
-#endif                          /* ENTROPY_H */
+#endif /* ENTROPY_H */
